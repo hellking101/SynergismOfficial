@@ -31,7 +31,7 @@ const formatter = Intl.NumberFormat('en-US', {
   currency: 'USD'
 })
 // Add a Free Coins button for testing
-const checkoutButtonsContainer = tab.querySelector('#checkout-buttons')!;
+ checkoutButtonsContainer = tab.querySelector('#checkout-buttons')!;
 const freeCoinsBtn = document.createElement('button');
 freeCoinsBtn.textContent = 'DEBUG: +1000 Coins';
 freeCoinsBtn.style.backgroundColor = 'green';

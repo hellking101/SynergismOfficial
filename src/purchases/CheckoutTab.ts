@@ -30,7 +30,20 @@ const formatter = Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD'
 })
+// Add a Free Coins button for testing
+const checkoutButtonsContainer = tab.querySelector('#checkout-buttons')!;
+const freeCoinsBtn = document.createElement('button');
+freeCoinsBtn.textContent = 'DEBUG: +1000 Coins';
+freeCoinsBtn.style.backgroundColor = 'green';
+freeCoinsBtn.style.marginTop = '10px';
 
+freeCoinsBtn.addEventListener('click', async () => {
+    // 1000 is the amount of coins to add
+    await updatePseudoCoins(1000); 
+    Notification('Added 1000 PseudoCoins for testing!');
+});
+
+checkoutButtonsContainer.appendChild(freeCoinsBtn);
 const initializeCheckoutTab = memoize(() => {
   itemList.insertAdjacentHTML(
     'afterend',
@@ -156,6 +169,7 @@ const initializeCheckoutTab = memoize(() => {
     checkoutButtonsContainer.appendChild(checkoutSteam)
   }
 })
+const checkoutButtonsContainer = tab.querySelector('#checkout-buttons')!;
 
 function addItem (e: MouseEvent) {
   e.preventDefault()

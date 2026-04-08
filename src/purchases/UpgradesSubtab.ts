@@ -169,4 +169,3 @@ export const updatePseudoCoins = async () => {
 
   return coins;
 }
-Use code with caution.Why this version is better:

@@ -8,7 +8,7 @@ import {
 } from '../PseudoCoinUpgrades'
 import { Alert, Notification } from '../UpdateHTML'
 import { isMobile, memoize } from '../Utility'
-import { player } from '../Synergism' // Ensure player is imported
+import { player } from '../Synergism' 
 
 interface UpgradesList {
   upgradeId: number
@@ -21,11 +21,12 @@ interface UpgradesList {
   playerLevel: number
 }
 
-// 1. Manually defined upgrades so the page isn't blank
+// 1. Manually defined upgrades - Syncs with the game's internal names
 const localUpgradesData: UpgradesList[] = [
-    { upgradeId: 1, maxLevel: 10, name: "Quark Boost", internalName: "QuarkGain", description: "Increase Quark gain permanently.", level: [1,2,3,4,5,6,7,8,9,10], cost: [0,0,0,0,0,0,0,0,0,0], playerLevel: 0 },
-    { upgradeId: 2, maxLevel: 5, name: "Exp Boost", internalName: "ExpGain", description: "Increase Experience gain.", level: [1,2,3,4,5], cost: [0,0,0,0,0], playerLevel: 0 },
-    { upgradeId: 3, maxLevel: 1, name: "Auto-Buy", internalName: "Automation", description: "Unlock advanced automation.", level: [1], cost: [0], playerLevel: 0 }
+    { upgradeId: 1, maxLevel: 100, name: "Quark Boost", internalName: "QuarkGain", description: "Increase Quark gain permanently.", level: [], cost: [], playerLevel: 0 },
+    { upgradeId: 2, maxLevel: 100, name: "Exp Boost", internalName: "ExpGain", description: "Increase Experience gain.", level: [], cost: [], playerLevel: 0 },
+    { upgradeId: 3, maxLevel: 1, name: "Automation", internalName: "Automation", description: "Unlock advanced automation.", level: [], cost: [], playerLevel: 0 },
+    { upgradeId: 4, maxLevel: 10, name: "Golden Quarks", internalName: "GoldenQuarks", description: "Boost Golden Quark efficiency.", level: [], cost: [], playerLevel: 0 }
 ];
 
 const tab = document.querySelector<HTMLElement>('#pseudoCoins > #upgradesContainer')!
@@ -33,9 +34,8 @@ let activeUpgrade: UpgradesList | undefined
 
 function setActiveUpgrade (upgrade: UpgradesList) {
   activeUpgrade = upgrade
-  const name = upgrade.name; // Simplified for local use
-
-  DOMCacheGetOrSet('pCoinUpgradeName').textContent = name
+  
+  DOMCacheGetOrSet('pCoinUpgradeName').textContent = upgrade.name
   DOMCacheGetOrSet('description').textContent = upgrade.description
   DOMCacheGetOrSet('pCoinUpgradeIcon').setAttribute(
     'src',
@@ -52,7 +52,7 @@ function setActiveUpgrade (upgrade: UpgradesList) {
   const costs = DOMCacheGetOrSet('pCoinScalingCosts')
   const effects = DOMCacheGetOrSet('pCoinScalingEffect')
 
-  if (upgrade.playerLevel === upgrade.maxLevel) {
+  if (upgrade.playerLevel >= upgrade.maxLevel) {
     buy.setAttribute('disabled', '')
     buy.style.display = 'none'
     nextEffect.style.display = 'none'
@@ -60,7 +60,7 @@ function setActiveUpgrade (upgrade: UpgradesList) {
     buy.removeAttribute('disabled')
     buy.style.display = 'block'
     nextEffect.style.display = 'block'
-    buy.innerHTML = "GET FOR FREE" 
+    buy.innerHTML = "ACTIVATE UPGRADE (FREE)" 
   }
 
   const info = showCostAndEffect(upgrade.internalName)
@@ -68,25 +68,34 @@ function setActiveUpgrade (upgrade: UpgradesList) {
   effects.textContent = info.effect
 }
 
-// 2. Modified to work locally without server requests
 async function purchaseUpgrade(upgrades: Map<number, UpgradesList>) {
   if (!activeUpgrade) {
-    Alert('Click on an upgrade to buy it.')
+    Alert('Click on an upgrade to activate it.')
     return
   }
 
   const upgrade = upgrades.get(activeUpgrade.upgradeId)
 
   if (upgrade && upgrade.playerLevel < upgrade.maxLevel) {
-    // Increment level locally
+    // Increment local level
     upgrade.playerLevel += 1;
     
-    // Update game cache so the effect actually works
+    // --- PERMANENT SAVE LOGIC ---
+    // 1. Ensure the shop object exists in the player's save
+    if (!player.pseudoCoinUpgrades) {
+        player.pseudoCoinUpgrades = {} as any;
+    }
+    
+    // 2. Write the new level to the actual player save file
+    // This ensures it stays after refresh
+    (player.pseudoCoinUpgrades as any)[upgrade.internalName] = upgrade.playerLevel;
+    
+    // 3. Update the game's internal cache so the bonus is applied immediately
     updatePCoinCache(upgrade.internalName, upgrade.playerLevel);
     
-    Notification(`Upgraded ${upgrade.name} to level ${upgrade.playerLevel}!`);
+    Notification(`${upgrade.name} upgraded to level ${upgrade.playerLevel}! Changes saved.`);
 
-    // Update UI elements
+    // Update UI
     const activeEl = tab.querySelector('#upgradeGrid > .active');
     if (activeEl) {
         activeEl.querySelector('p#a')!.textContent = `${upgrade.playerLevel}/${upgrade.maxLevel}`;
@@ -94,36 +103,36 @@ async function purchaseUpgrade(upgrades: Map<number, UpgradesList>) {
     }
 
     setActiveUpgrade(upgrade);
-    updatePseudoCoins(); // Refresh display
+    updatePseudoCoins(); 
   }
 }
 
 const initializeUpgradeSubtab = memoize(() => {
   const grouped = new Map<number, UpgradesList>();
   
-  // Load local data into the map
   localUpgradesData.forEach(u => {
-      // Sync with player's actual save if possible
-      // Assuming player.pseudoCoinUpgrades[u.internalName] exists
+      // READ FROM SAVE: Get the level from the player object on load
+      const savedLevel = (player.pseudoCoinUpgrades as any)?.[u.internalName] ?? 0;
+      u.playerLevel = savedLevel;
+      
       grouped.set(u.upgradeId, u);
   });
 
   tab.querySelector('#upgradeGrid')!.innerHTML = [...grouped.values()].map((u) => `
     <div
       data-id="${u.upgradeId}"
-      data-key="${u.name}"
       class="upgradeItem"
-      style="margin: 20px; border: 1px solid gold; padding: 10px; cursor: pointer;"
+      style="margin: 15px; border: 2px solid #ffd700; padding: 10px; cursor: pointer; background: rgba(0,0,0,0.5); text-align: center; border-radius: 8px;"
     >
-      <img src='Pictures/PseudoShop/${u.internalName}.png' alt='${u.internalName}' style="width:50px; height:50px;" />
-      <p id="a">${u.playerLevel}/${u.maxLevel}</p>
-      <p id="b">${u.playerLevel === u.maxLevel ? '✔️' : ''}</p>
+      <img src='Pictures/PseudoShop/${u.internalName}.png' alt='${u.internalName}' style="width:48px; height:48px;" />
+      <p id="a" style="margin: 5px 0 0 0; font-weight: bold;">${u.playerLevel}/${u.maxLevel}</p>
+      <p id="b" style="color: #00ff00;">${u.playerLevel === u.maxLevel ? '✔️' : ''}</p>
     </div>
   `).join('')
 
   const upgradesInGrid = tab.querySelectorAll<HTMLElement>('#upgradeGrid > div[data-id]')
   upgradesInGrid.forEach((element) => {
-    element.addEventListener('click', (e) => {
+    element.addEventListener('click', () => {
       const upgradeId = Number(element.getAttribute('data-id'))
       const upgrade = grouped.get(upgradeId)
       if (upgrade) {
@@ -134,7 +143,7 @@ const initializeUpgradeSubtab = memoize(() => {
     })
   })
 
-  // Replace old listener to use our new local purchase function
+  // Setup the buy button click
   const buyBtn = DOMCacheGetOrSet('buy');
   const newBuyBtn = buyBtn.cloneNode(true);
   buyBtn.parentNode?.replaceChild(newBuyBtn, buyBtn);
@@ -150,7 +159,6 @@ export const clearUpgradeSubtab = () => {
   tab.style.display = 'none'
 }
 
-// 3. Modified to show local coin balance only
 export const updatePseudoCoins = async () => {
   const coins = player.pseudoCoins || 0;
   const display = tab.querySelector('#pseudoCoinAmounts > #currentCoinBalance');
@@ -161,4 +169,4 @@ export const updatePseudoCoins = async () => {
 
   return coins;
 }
-Use code with caution.
+Use code with caution.Why this version is better:

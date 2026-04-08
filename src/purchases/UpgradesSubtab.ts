@@ -8,7 +8,7 @@ import {
 } from '../PseudoCoinUpgrades'
 import { Alert, Notification } from '../UpdateHTML'
 import { isMobile, memoize } from '../Utility'
-import { player } from '../Synergism' 
+import { player, format } from '../Synergism' 
 
 interface UpgradesList {
   upgradeId: number
@@ -21,12 +21,11 @@ interface UpgradesList {
   playerLevel: number
 }
 
-// 1. Manually defined upgrades - Syncs with the game's internal names
+// 1. Manually defined upgrades using internal names the game engine recognizes
 const localUpgradesData: UpgradesList[] = [
     { upgradeId: 1, maxLevel: 100, name: "Quark Boost", internalName: "QuarkGain", description: "Increase Quark gain permanently.", level: [], cost: [], playerLevel: 0 },
     { upgradeId: 2, maxLevel: 100, name: "Exp Boost", internalName: "ExpGain", description: "Increase Experience gain.", level: [], cost: [], playerLevel: 0 },
-    { upgradeId: 3, maxLevel: 1, name: "Automation", internalName: "Automation", description: "Unlock advanced automation.", level: [], cost: [], playerLevel: 0 },
-    { upgradeId: 4, maxLevel: 10, name: "Golden Quarks", internalName: "GoldenQuarks", description: "Boost Golden Quark efficiency.", level: [], cost: [], playerLevel: 0 }
+    { upgradeId: 3, maxLevel: 1, name: "Automation", internalName: "Automation", description: "Unlock advanced automation.", level: [], cost: [], playerLevel: 0 }
 ];
 
 const tab = document.querySelector<HTMLElement>('#pseudoCoins > #upgradesContainer')!
@@ -39,15 +38,19 @@ function setActiveUpgrade (upgrade: UpgradesList) {
   DOMCacheGetOrSet('description').textContent = upgrade.description
   DOMCacheGetOrSet('pCoinUpgradeIcon').setAttribute(
     'src',
-    `Pictures/PseudoShop/${upgrade.internalName ?? 'PseudoCoins'}.png`
+    `Pictures/PseudoShop/${upgrade.internalName}.png`
   )
 
   const buy = DOMCacheGetOrSet('buy')
   const currEffect = DOMCacheGetOrSet('pCoinEffectCurr')
   const nextEffect = DOMCacheGetOrSet('pCoinEffectNext')
 
-  currEffect.innerHTML = `Current: ${displayPCoinEffect(upgrade.internalName, upgrade.playerLevel)}`
-  nextEffect.innerHTML = `Next: ${displayPCoinEffect(upgrade.internalName, upgrade.playerLevel + 1)}`
+  // Pulling logic directly from the game's effect engine
+  const currentEffectText = displayPCoinEffect(upgrade.internalName, upgrade.playerLevel);
+  const nextEffectText = displayPCoinEffect(upgrade.internalName, upgrade.playerLevel + 1);
+
+  currEffect.innerHTML = `Current: ${currentEffectText ?? 'Active'}`
+  nextEffect.innerHTML = `Next: ${nextEffectText ?? 'Maxed'}`
 
   const costs = DOMCacheGetOrSet('pCoinScalingCosts')
   const effects = DOMCacheGetOrSet('pCoinScalingEffect')
@@ -60,42 +63,38 @@ function setActiveUpgrade (upgrade: UpgradesList) {
     buy.removeAttribute('disabled')
     buy.style.display = 'block'
     nextEffect.style.display = 'block'
-    buy.innerHTML = "ACTIVATE UPGRADE (FREE)" 
+    buy.innerHTML = "ACTIVATE FOR FREE" 
   }
 
   const info = showCostAndEffect(upgrade.internalName)
   costs.textContent = "FREE"
-  effects.textContent = info.effect
+  effects.textContent = info.effect || "Scaling Active"
 }
 
 async function purchaseUpgrade(upgrades: Map<number, UpgradesList>) {
   if (!activeUpgrade) {
-    Alert('Click on an upgrade to activate it.')
+    Alert('Select an upgrade first!')
     return
   }
 
   const upgrade = upgrades.get(activeUpgrade.upgradeId)
 
   if (upgrade && upgrade.playerLevel < upgrade.maxLevel) {
-    // Increment local level
+    // Increment level
     upgrade.playerLevel += 1;
     
-    // --- PERMANENT SAVE LOGIC ---
-    // 1. Ensure the shop object exists in the player's save
+    // Save to the player's local save file
     if (!player.pseudoCoinUpgrades) {
         player.pseudoCoinUpgrades = {} as any;
     }
-    
-    // 2. Write the new level to the actual player save file
-    // This ensures it stays after refresh
     (player.pseudoCoinUpgrades as any)[upgrade.internalName] = upgrade.playerLevel;
     
-    // 3. Update the game's internal cache so the bonus is applied immediately
+    // Update game cache to apply the bonus immediately
     updatePCoinCache(upgrade.internalName, upgrade.playerLevel);
     
-    Notification(`${upgrade.name} upgraded to level ${upgrade.playerLevel}! Changes saved.`);
+    Notification(`Success! ${upgrade.name} is now level ${upgrade.playerLevel}`);
 
-    // Update UI
+    // Update UI elements
     const activeEl = tab.querySelector('#upgradeGrid > .active');
     if (activeEl) {
         activeEl.querySelector('p#a')!.textContent = `${upgrade.playerLevel}/${upgrade.maxLevel}`;
@@ -111,10 +110,9 @@ const initializeUpgradeSubtab = memoize(() => {
   const grouped = new Map<number, UpgradesList>();
   
   localUpgradesData.forEach(u => {
-      // READ FROM SAVE: Get the level from the player object on load
+      // Sync with existing player save
       const savedLevel = (player.pseudoCoinUpgrades as any)?.[u.internalName] ?? 0;
       u.playerLevel = savedLevel;
-      
       grouped.set(u.upgradeId, u);
   });
 
@@ -122,11 +120,11 @@ const initializeUpgradeSubtab = memoize(() => {
     <div
       data-id="${u.upgradeId}"
       class="upgradeItem"
-      style="margin: 15px; border: 2px solid #ffd700; padding: 10px; cursor: pointer; background: rgba(0,0,0,0.5); text-align: center; border-radius: 8px;"
+      style="margin: 10px; border: 1px solid gold; padding: 10px; cursor: pointer; text-align: center; border-radius: 4px;"
     >
-      <img src='Pictures/PseudoShop/${u.internalName}.png' alt='${u.internalName}' style="width:48px; height:48px;" />
-      <p id="a" style="margin: 5px 0 0 0; font-weight: bold;">${u.playerLevel}/${u.maxLevel}</p>
-      <p id="b" style="color: #00ff00;">${u.playerLevel === u.maxLevel ? '✔️' : ''}</p>
+      <img src='Pictures/PseudoShop/${u.internalName}.png' alt='${u.internalName}' style="width:40px; height:40px;" />
+      <p id="a" style="margin: 5px 0;">${u.playerLevel}/${u.maxLevel}</p>
+      <p id="b" style="color: green;">${u.playerLevel === u.maxLevel ? '✔️' : ''}</p>
     </div>
   `).join('')
 
@@ -143,7 +141,7 @@ const initializeUpgradeSubtab = memoize(() => {
     })
   })
 
-  // Setup the buy button click
+  // Setup the button replacement to avoid old server listeners
   const buyBtn = DOMCacheGetOrSet('buy');
   const newBuyBtn = buyBtn.cloneNode(true);
   buyBtn.parentNode?.replaceChild(newBuyBtn, buyBtn);
@@ -153,6 +151,7 @@ const initializeUpgradeSubtab = memoize(() => {
 export const toggleUpgradeSubtab = () => {
   initializeUpgradeSubtab()
   tab.style.display = 'flex'
+  updatePseudoCoins() // Ensure coins update on tab switch
 }
 
 export const clearUpgradeSubtab = () => {
@@ -160,12 +159,14 @@ export const clearUpgradeSubtab = () => {
 }
 
 export const updatePseudoCoins = async () => {
+  // Directly pull from local save file
   const coins = player.pseudoCoins || 0;
+  
   const display = tab.querySelector('#pseudoCoinAmounts > #currentCoinBalance');
-  if (display) display.innerHTML = `PseudoCoins: ${Intl.NumberFormat().format(coins)}`;
+  if (display) display.innerHTML = `PseudoCoins: ${format(coins, 0, true)}`;
   
   const display2 = DOMCacheGetOrSet('currentCoinBalance2');
-  if (display2) display2.innerHTML = `PseudoCoins: ${Intl.NumberFormat().format(coins)}`;
+  if (display2) display2.innerHTML = `PseudoCoins: ${format(coins, 0, true)}`;
 
   return coins;
 }

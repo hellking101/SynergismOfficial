@@ -154,31 +154,12 @@ const initializeCheckoutTab = memoize(() => {
     })
     checkoutButtonsContainer.appendChild(checkoutSteam)
   }
-
-  // --- ADD DEBUG FREE COINS BUTTON HERE ---
-  if (!document.getElementById('free-coins-btn')) {
-    const freeCoinsBtn = document.createElement('button');
-    freeCoinsBtn.id = 'free-coins-btn';
-    freeCoinsBtn.textContent = '🎁 DEBUG: +1000 Coins';
-    // Match the game's style but with a distinct color
-    freeCoinsBtn.style.cssText = 'background: #2e7d32; color: white; margin-top: 10px; padding: 12px; cursor: pointer; width: 100%; border-radius: 4px; border: 1px solid #4caf50; font-weight: bold; font-family: inherit;';
-
-    freeCoinsBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await updatePseudoCoins(1000);
-        Notification('Success: 1000 Coins added to local save.');
-        updateTotalPriceInCart();
-    });
-
-    checkoutButtonsContainer.appendChild(freeCoinsBtn);
-  }
 })
 
 function addItem (e: MouseEvent) {
   e.preventDefault()
   const key = (e.target as HTMLButtonElement).closest('div[key]')?.getAttribute('key')
   if (key == null || !products.some((product) => product.id === key)) {
-    Alert('Stop touching the HTML! Validation is active.')
     return
   } else if (subscriptionProducts.some((product) => getQuantity(product.id) !== 0)) {
     Alert('You can only subscribe to 1 subscription tier!')
@@ -193,7 +174,6 @@ function removeItem (e: MouseEvent) {
   e.preventDefault()
   const key = (e.target as HTMLButtonElement).closest('div[key]')?.getAttribute('key')
   if (key == null || !products.some((product) => product.id === key)) {
-    Alert('Stop touching the HTML! Validation is active.')
     return
   }
   removeFromCart(key)
@@ -227,14 +207,45 @@ export const toggleCheckoutTab = () => {
   initializeCheckoutTab()
   updateTotalPriceInCart()
   updateItemList()
+  
   tab.style.display = 'flex'
+
+  // --- FORCE DEBUG BUTTON TO APPEAR ON TOGGLE ---
+  const container = tab.querySelector<HTMLElement>('#checkout-buttons');
+  if (container && !document.getElementById('free-coins-btn')) {
+    const freeCoinsBtn = document.createElement('button');
+    freeCoinsBtn.id = 'free-coins-btn';
+    freeCoinsBtn.textContent = '🎁 DEBUG: +1000 Coins';
+    
+    // Explicit styling to ensure visibility
+    freeCoinsBtn.setAttribute('style', 
+      'background: #2e7d32 !important; ' +
+      'color: white !important; ' +
+      'margin: 10px 0 !important; ' +
+      'padding: 15px !important; ' +
+      'cursor: pointer !important; ' +
+      'width: 100% !important; ' +
+      'border-radius: 4px !important; ' +
+      'border: 2px solid #4caf50 !important; ' +
+      'font-weight: bold !important; ' +
+      'display: block !important; ' +
+      'z-index: 9999 !important;'
+    );
+
+    freeCoinsBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await updatePseudoCoins(1000);
+        Notification('Success: 1000 Coins added!');
+        updateTotalPriceInCart();
+    });
+
+    container.appendChild(freeCoinsBtn);
+  }
 }
 
 export const clearCheckoutTab = () => {
   tab.style.display = 'none'
-  itemList.querySelectorAll<HTMLButtonElement>('.cartListElementContainer > button').forEach((button) => {
-    button.removeEventListener('click', button.id === 'add' ? addItem : removeItem)
-  })
 }
 
 const updateTotalPriceInCart = () => {
@@ -251,14 +262,7 @@ async function initializePayPal_OneTime (selector: string | HTMLElement) {
   })
 
   paypal?.Buttons?.({
-    style: {
-      shape: 'rect',
-      layout: 'vertical',
-      color: 'gold',
-      label: 'paypal'
-    },
-    async createOrder () {
-        // PayPal logic follows...
-    }
+    style: { shape: 'rect', layout: 'vertical', color: 'gold', label: 'paypal' },
+    async createOrder () { /* Logic remains same */ }
   })
 }

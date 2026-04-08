@@ -169,7 +169,6 @@ const initializeCheckoutTab = memoize(() => {
     checkoutButtonsContainer.appendChild(checkoutSteam)
   }
 })
-checkoutButtonsContainer = tab.querySelector('#checkout-buttons')!;
 
 function addItem (e: MouseEvent) {
   e.preventDefault()
